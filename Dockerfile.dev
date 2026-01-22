@@ -1,46 +1,32 @@
+# Build stage
+FROM node:20-alpine as build
 
-# ---------- build stage ----------
-FROM node:20-alpine AS build
-
+# Set working directory
 WORKDIR /app
 
-# Copy only manifest first for better caching
+# Copy package files
 COPY package*.json ./
 
-# Install ALL deps (dev + prod) so Vite can build
+# Install dependencies (including 'serve')
 RUN npm ci
 
-# Copy source and build
+# Copy project files
 COPY . .
+
+# Build the app
 RUN npm run build
 
-# Remove devDependencies so runtime only has production deps (keeps image smaller)
-# This keeps "serve" (which is in dependencies) and removes Vite/dev tooling.
-RUN npm prune --omit=dev
-
-# ---------- production runtime (distroless) ----------
-# NOTE: Distroless has no shell and may not have /usr/bin/env.
-# We will invoke the 'serve' JS entry directly via Node.
+# Production stage (distroless)
 FROM gcr.io/distroless/nodejs20-debian12
 
 WORKDIR /app
 
-# Copy only the minimal runtime artifacts
+# Copy built files and node_modules from the build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 
-# (Optional) Run as non-root; distroless has a nonroot user 65532
-USER 65532:65532
-
-# Expose the port your server listens on (keep 3000 as per your plan)
+# Expose port 3000
 EXPOSE 3000
 
-# Distroless node images set ENTRYPOINT to "node" by default.
-# Still, we make it explicit to avoid ambiguity across variants:
-ENTRYPOINT ["node"]
-
-# IMPORTANT:
-# Call the actual JS file of 'serve' — don't rely on ./node_modules/.bin/serve
-# which uses a shebang and /usr/bin/env that distroless may not have.
-CMD ["/app/node_modules/serve/bin/serve.js", "-s", "dist", "-l", "3000"]
-``
+# Start the application using 'serve' from local node_modules
+CMD ["./node_modules/.bin/serve", "-s", "dist", "-l", "3000"]
