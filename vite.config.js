@@ -13,7 +13,9 @@ export default defineConfig({
       strictPort: true,
       allowedHosts: [
         '16-16-128-178.nip.io',
-        'localhost'
+        'localhost',
+        '52.201.61.44',
+        'ec2-52-201-61-44.compute-1.amazonaws.com'
       ]
     }
 })
